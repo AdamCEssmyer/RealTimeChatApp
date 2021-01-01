@@ -22,14 +22,12 @@ type Message struct {
 
 func main() {
 	// Create a simple file server
-	fs := http.FileServer(http.Dir("../public"))
+	fs := http.FileServer(http.Dir("../vueproject"))
 	http.Handle("/", fs)
 
 	// Configure websocket route
 	http.HandleFunc("/ws", handleConnections)
 
-	// Start listening for incoming chat messages
-	go handleMessages()
 	// Start the server on localhost port 8000 and log any errors
 	log.Println("http server started on :8000")
 	err := http.ListenAndServe(":8000", nil)
@@ -59,5 +57,22 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		broadcast <- msg
+	}
+}
+
+// Start listening for incoming chat messages
+func handleMessages() {
+	for {
+		// Grab the next message from the broadcast channel
+		msg := <-broadcast
+		// Send it out to every client that is current
+		for client := range clients {
+			err := client.WriteJSON(msg)
+			if err != nil {
+				log.Printf("error: %v", err)
+				client.Close()
+				delete(clients, client)
+			}
+		}
 	}
 }
